@@ -12,32 +12,25 @@
     getFirestore, doc, getDoc, setDoc, collection,
     addDoc, updateDoc, deleteDoc, getDocs, onSnapshot, query, orderBy
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  
+const firebaseConfig = {
+  apiKey: "AIzaSyDX-OBFKTjlQgazdLIO6eP40W4oQZoa0DI",
+  authDomain: "louvor-escala-1a1fd.firebaseapp.com",
+  projectId: "louvor-escala-1a1fd",
+  storageBucket: "louvor-escala-1a1fd.firebasestorage.app",
+  messagingSenderId: "192415521259",
+  appId: "1:192415521259:web:37e21268d15f4306efa1ae"
+};
 
-  // ============================================================
-  // CONFIGURACAO FIREBASE
-  // Substitua pelos dados do seu projeto Firebase:
-  // 1. Acesse https://console.firebase.google.com
-  // 2. Crie um projeto
-  // 3. Adicione um app Web
-  // 4. Copie as configs abaixo
-  // ============================================================
-  const firebaseConfig = {
-    apiKey: "SUA_API_KEY",
-    authDomain: "SEU_PROJETO.firebaseapp.com",
-    projectId: "SEU_PROJETO_ID",
-    storageBucket: "SEU_PROJETO.appspot.com",
-    messagingSenderId: "SEU_MESSAGING_ID",
-    appId: "SEU_APP_ID"
-  };
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-
-  // Expoe db e funcoes do Firestore globalmente
-  window._db = db;
-  window._fs = { doc, getDoc, setDoc, collection, addDoc, updateDoc, deleteDoc, getDocs, onSnapshot, query, orderBy };
-  window._firebaseReady = true;
-  window.dispatchEvent(new Event('firebase-ready'));
+// Expoe db e funcoes do Firestore globalmente
+window._db = db;
+window._fs = { doc, getDoc, setDoc, collection, addDoc, updateDoc, deleteDoc, getDocs, onSnapshot, query, orderBy };
+window._firebaseReady = true;
+window.dispatchEvent(new Event('firebase-ready'));
 </script>
 
 <!-- jsPDF -->
