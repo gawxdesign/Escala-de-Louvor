@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LouvorScale</title>
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getFirestore, doc, getDoc, setDoc, collection,
+    addDoc, updateDoc, deleteDoc, getDocs, onSnapshot, query, orderBy
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  // ============================================================
+  // CONFIGURACAO FIREBASE
+  // Substitua pelos dados do seu projeto Firebase:
+  // 1. Acesse https://console.firebase.google.com
+  // 2. Crie um projeto
+  // 3. Adicione um app Web
+  // 4. Copie as configs abaixo
+  // ============================================================
+  const firebaseConfig = {
+    apiKey: "SUA_API_KEY",
+    authDomain: "SEU_PROJETO.firebaseapp.com",
+    projectId: "SEU_PROJETO_ID",
+    storageBucket: "SEU_PROJETO.appspot.com",
+    messagingSenderId: "SEU_MESSAGING_ID",
+    appId: "SEU_APP_ID"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // Expoe db e funcoes do Firestore globalmente
+  window._db = db;
+  window._fs = { doc, getDoc, setDoc, collection, addDoc, updateDoc, deleteDoc, getDocs, onSnapshot, query, orderBy };
+  window._firebaseReady = true;
+  window.dispatchEvent(new Event('firebase-ready'));
+</script>
+
+<!-- jsPDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root {
+  --bg:#121315;--bg2:#1a1c1f;--bg3:#222427;--bg4:#2a2d31;
+  --accent:#B6FF56;--accent2:#F1FFDC;--accent-dim:rgba(182,255,86,.12);--accent-border:rgba(182,255,86,.3);
+  --text:#F1FFDC;--text2:rgba(241,255,220,.65);--text3:rgba(241,255,220,.35);
+  --border:rgba(241,255,220,.08);--border2:rgba(241,255,220,.15);
+  --danger:#ff6b6b;--danger-dim:rgba(255,107,107,.12);
+  --success:#56ffb6;--warn:#ffcc56;--warn-dim:rgba(255,204,86,.12);
+  --radius:10px;--radius-lg:16px;
+  font-family:'Space Grotesk',sans-serif;
+}
+
+body{background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* NAV */
+.nav{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:center;gap:0;height:54px;position:sticky;top:0;z-index:100;flex-wrap:nowrap}
+.nav-logo{font-size:15px;font-weight:700;color:var(--accent);letter-spacing:-.02em;margin-right:24px;white-space:nowrap}
+.nav-logo span{color:var(--text2);font-weight:400}
+.nav-tabs{display:flex;gap:2px;flex:1;overflow-x:auto;scrollbar-width:none}
+.nav-tabs::-webkit-scrollbar{display:none}
+.nav-tab{padding:5px 14px;border-radius:8px;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;border:none;background:transparent;white-space:nowrap;transition:all .15s;letter-spacing:.02em;font-family:inherit;text-transform:uppercase}
+.nav-tab:hover{color:var(--text);background:var(--bg3)}
+.nav-tab.active{color:var(--accent);background:var(--accent-dim)}
+.nav-actions{display:flex;gap:6px;margin-left:12px;flex-shrink:0}
+
+/* SYNC BAR */
+.sync-bar{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;margin-bottom:18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;transition:background .3s}
+.sync-dot.off{background:var(--text3)}
+.sync-dot.syncing{background:var(--warn);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.sync-text{font-size:12px;color:var(--text2);flex:1;font-family:'DM Mono',monospace}
+
+/* BUTTONS */
+.btn{padding:7px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border2);background:var(--bg3);color:var(--text);font-family:inherit;transition:all .15s;white-space:nowrap;letter-spacing:.02em;text-transform:uppercase}
+.btn:hover{border-color:var(--accent-border);color:var(--accent)}
+.btn-accent{background:var(--accent);color:#121315;border-color:var(--accent)}
+.btn-accent:hover{background:var(--accent2);border-color:var(--accent2);color:#121315}
+.btn-sm{padding:4px 10px;font-size:11px}
+.btn-danger{border-color:rgba(255,107,107,.3);color:var(--danger)}
+.btn-danger:hover{background:var(--danger-dim)}
+
+/* MAIN */
+.main{padding:20px;max-width:1200px;margin:0 auto}
+
+/* PANELS */
+.panel{display:none}.panel.active{display:block}
+
+/* SECTION HEADER */
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:12px;flex-wrap:wrap}
+.section-title{font-size:20px;font-weight:700;letter-spacing:-.02em}
+.section-sub{font-size:13px;color:var(--text2);margin-top:2px}
+
+/* CARDS */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;margin-bottom:14px}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.card-title{font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.07em;text-transform:uppercase}
+
+/* GRID */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+
+/* STAT CARDS */
+.stat-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
+.stat-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.09em;text-transform:uppercase;margin-bottom:5px}
+.stat-value{font-size:30px;font-weight:700;color:var(--accent);letter-spacing:-.03em}
+.stat-desc{font-size:11px;color:var(--text2);margin-top:3px}
+
+/* FORMS */
+.form-row{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.form-group{display:flex;flex-direction:column;gap:4px;flex:1;min-width:130px}
+.form-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase}
+.form-input,.form-select,.form-textarea{background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:inherit;font-size:13px;padding:8px 11px;transition:border-color .15s;outline:none;width:100%}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent-border)}
+.form-textarea{resize:vertical;min-height:76px}
+.form-select option{background:var(--bg3);color:var(--text)}
+
+/* TABLE */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:var(--bg3);color:var(--text3);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:9px 11px;text-align:left;border-bottom:1px solid var(--border)}
+td{padding:9px 11px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle}
+tr:hover td{background:rgba(255,255,255,.02)}
+
+/* BADGES */
+.badge{display:inline-block;padding:2px 8px;border-radius:100px;font-size:11px;font-weight:600;letter-spacing:.03em}
+.badge-green{background:rgba(86,255,182,.12);color:var(--success)}
+.badge-red{background:var(--danger-dim);color:var(--danger)}
+.badge-yellow{background:var(--warn-dim);color:var(--warn)}
+.badge-accent{background:var(--accent-dim);color:var(--accent)}
+.badge-gray{background:var(--bg4);color:var(--text2)}
+
+/* PRESENCA */
+.presenca-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:9px}
+.musico-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:13px;display:flex;align-items:center;gap:11px;cursor:pointer;transition:all .15s}
+.musico-card:hover{border-color:var(--border2)}
+.musico-card.presente{border-color:var(--accent-border);background:var(--accent-dim)}
+.musico-card.ausente{border-color:rgba(255,107,107,.2);background:var(--danger-dim)}
+.avatar{width:34px;height:34px;border-radius:50%;background:var(--bg4);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--accent);flex-shrink:0}
+.musico-name{font-size:13px;font-weight:600}
+.musico-inst{font-size:11px;color:var(--text2);margin-top:1px}
+
+/* DAY CHIPS */
+.week-selector{display:flex;gap:7px;margin-bottom:18px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.week-selector::-webkit-scrollbar{display:none}
+.day-chip{padding:7px 15px;border-radius:100px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);font-family:inherit;transition:all .15s;white-space:nowrap}
+.day-chip:hover{border-color:var(--accent-border);color:var(--accent)}
+.day-chip.active{background:var(--accent);color:#121315;border-color:var(--accent)}
+
+/* MUSIC ROW */
+.music-row{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:13px 15px;margin-bottom:9px;display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+.music-row .music-name{font-size:14px;font-weight:600;flex:1;min-width:110px}
+.music-row .music-meta{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center;padding:16px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:22px;width:100%;max-width:520px;max-height:88vh;overflow-y:auto}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:18px}
+
+.mini-line{height:1px;background:var(--border);margin:14px 0}
+
+/* LOADING OVERLAY */
+.loading-overlay{position:fixed;inset:0;background:var(--bg);z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;transition:opacity .4s}
+.loading-overlay.hidden{opacity:0;pointer-events:none}
+.loading-logo{font-size:28px;font-weight:700;color:var(--accent);letter-spacing:-.03em}
+.loading-logo span{color:var(--text2);font-weight:400}
+.loading-bar{width:180px;height:3px;background:var(--bg3);border-radius:2px;overflow:hidden}
+.loading-bar-inner{height:100%;background:var(--accent);border-radius:2px;animation:load 1.8s ease infinite}
+@keyframes load{0%{width:0%;transform:translateX(0)}60%{width:70%}100%{width:100%;transform:translateX(100%)}}
+.loading-text{font-size:12px;color:var(--text3);font-family:'DM Mono',monospace}
+
+/* MUSICOS CHECKBOXES */
+.musico-check-label{display:flex;align-items:center;gap:7px;cursor:pointer;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:500;transition:border-color .15s}
+.musico-check-label:hover{border-color:var(--accent-border)}
+.musico-check-label input{accent-color:var(--accent)}
+
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+@media(max-width:768px){
+  .grid-2,.grid-3,.grid-4{grid-template-columns:1fr}
+  .nav{padding:0 10px}
+  .main{padding:12px}
+  .form-row{flex-direction:column}
+}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="loading-logo">Louvor<span>Scale</span></div>
+  <div class="loading-bar"><div class="loading-bar-inner"></div></div>
+  <div class="loading-text" id="loading-text">Conectando ao Firebase...</div>
+</div>
+
+<!-- NAV -->
+<div class="nav">
+  <div class="nav-logo">Louvor<span>Scale</span></div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPanel('dashboard',this)">Dashboard</button>
+    <button class="nav-tab" onclick="showPanel('escala',this)">Escala</button>
+    <button class="nav-tab" onclick="showPanel('presenca',this)">Presenca</button>
+    <button class="nav-tab" onclick="showPanel('ensaio',this)">Ensaio</button>
+    <button class="nav-tab" onclick="showPanel('musicos',this)">Musicos</button>
+    <button class="nav-tab" onclick="showPanel('config',this)">Config</button>
+  </div>
+  <div class="nav-actions">
+    <button class="btn btn-accent" onclick="gerarPDF()">Gerar PDF</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- SYNC BAR -->
+  <div class="sync-bar">
+    <div class="sync-dot off" id="syncDot"></div>
+    <span class="sync-text" id="syncText">Aguardando Firebase...</span>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="panel active" id="panel-dashboard">
+    <div class="section-header">
+      <div><div class="section-title">Visao Geral</div><div class="section-sub">Resumo do ministerio</div></div>
+    </div>
+    <div class="grid-4" style="margin-bottom:18px;">
+      <div class="stat-card"><div class="stat-label">Cultos</div><div class="stat-value" id="d-cultos">0</div><div class="stat-desc">registrados</div></div>
+      <div class="stat-card"><div class="stat-label">Musicos</div><div class="stat-value" id="d-musicos-total">0</div><div class="stat-desc">cadastrados</div></div>
+      <div class="stat-card"><div class="stat-label">Presencas</div><div class="stat-value" id="d-presencas">0</div><div class="stat-desc">confirmadas</div></div>
+      <div class="stat-card"><div class="stat-label">Musicas Ensaio</div><div class="stat-value" id="d-musicas">0</div><div class="stat-desc">registradas</div></div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Proximos Cultos</span></div>
+        <div id="d-lista-cultos"><div style="color:var(--text3);font-size:13px;text-align:center;padding:20px;">Nenhum culto</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Musicos do Ministerio</span></div>
+        <div id="d-lista-musicos"><div style="color:var(--text3);font-size:13px;text-align:center;padding:20px;">Nenhum musico</div></div>
+      </div>
+    </div>
+    <div class="grid-2" style="margin-top:14px;">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Presenca Consolidada</span></div>
+        <div id="d-presenca-lista"><div style="color:var(--text3);font-size:13px;text-align:center;padding:20px;">Sem registros</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Setlist Ensaio</span></div>
+        <div id="d-ensaio-lista"><div style="color:var(--text3);font-size:13px;text-align:center;padding:20px;">Sem musicas</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ESCALA -->
+  <div class="panel" id="panel-escala">
+    <div class="section-header">
+      <div><div class="section-title">Escala de Cultos</div><div class="section-sub">Cultos e musicos escalados por dia</div></div>
+      <button class="btn btn-accent" onclick="abrirModalCulto()">+ Novo Culto</button>
+    </div>
+    <div class="week-selector" id="weekDays"></div>
+    <div id="culto-detail"><div class="card" style="text-align:center;color:var(--text3);padding:40px;">Selecione um dia ou crie um novo culto</div></div>
+  </div>
+
+  <!-- PRESENCA -->
+  <div class="panel" id="panel-presenca">
+    <div class="section-header">
+      <div><div class="section-title">Controle de Presenca</div><div class="section-sub">Marque a presenca por evento</div></div>
+    </div>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-header" style="margin-bottom:10px;"><span class="card-title">Selecionar Evento</span></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Evento</label>
+          <select class="form-select" id="presenca-evento" onchange="carregarPresenca()">
+            <option value="">Selecione um culto...</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex:0;min-width:160px;justify-content:flex-end;">
+          <label class="form-label">Status</label>
+          <div style="display:flex;gap:6px;align-items:center;height:36px;">
+            <span class="badge badge-green" id="p-presentes">0 presentes</span>
+            <span class="badge badge-red" id="p-ausentes">0 ausentes</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="presenca-grid" id="presenca-grid">
+      <div class="card" style="text-align:center;color:var(--text3);grid-column:1/-1;">Selecione um evento para marcar presenca</div>
+    </div>
+  </div>
+
+  <!-- ENSAIO -->
+  <div class="panel" id="panel-ensaio">
+    <div class="section-header">
+      <div><div class="section-title">Registro de Ensaio</div><div class="section-sub">Musicas, tons, instrumentos e observacoes</div></div>
+      <button class="btn btn-accent" onclick="abrirModalEnsaio()">+ Nova Musica</button>
+    </div>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-header" style="margin-bottom:10px;"><span class="card-title">Dados do Ensaio</span></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Vincular ao Culto</label>
+          <select class="form-select" id="ensaio-culto" onchange="salvarEnsaioMeta()">
+            <option value="">Ensaio independente</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Data do Ensaio</label>
+          <input type="date" class="form-input" id="ensaio-data" onchange="salvarEnsaioMeta()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Local</label>
+          <input type="text" class="form-input" id="ensaio-local" placeholder="Sala de louvor..." onchange="salvarEnsaioMeta()">
+        </div>
+      </div>
+    </div>
+    <div id="ensaio-musicas-lista">
+      <div class="card" style="text-align:center;color:var(--text3);padding:30px;">Nenhuma musica registrada.</div>
+    </div>
+  </div>
+
+  <!-- MUSICOS -->
+  <div class="panel" id="panel-musicos">
+    <div class="section-header">
+      <div><div class="section-title">Cadastro de Musicos</div><div class="section-sub">Integrantes do ministerio</div></div>
+      <button class="btn btn-accent" onclick="abrirModalMusico()">+ Novo Musico</button>
+    </div>
+    <div class="grid-3" id="musicos-grid">
+      <div class="card" style="text-align:center;color:var(--text3);grid-column:1/-1;">Nenhum musico cadastrado.</div>
+    </div>
+  </div>
+
+  <!-- CONFIG -->
+  <div class="panel" id="panel-config">
+    <div class="section-header"><div><div class="section-title">Configuracoes</div></div></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Informacoes da Igreja</span></div>
+        <div class="form-group" style="margin-bottom:10px;"><label class="form-label">Nome da Igreja</label><input type="text" class="form-input" id="cfg-igreja" placeholder="Igreja Exemplo" oninput="salvarConfigDebounce()"></div>
+        <div class="form-group" style="margin-bottom:10px;"><label class="form-label">Ministerio</label><input type="text" class="form-input" id="cfg-ministerio" placeholder="Ministerio de Louvor" oninput="salvarConfigDebounce()"></div>
+        <div class="form-group"><label class="form-label">Lider</label><input type="text" class="form-input" id="cfg-lider" placeholder="Nome do Lider" oninput="salvarConfigDebounce()"></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Instrumentos</span></div>
+        <div id="instrumentos-lista" style="margin-bottom:10px;"></div>
+        <div class="form-row" style="margin-bottom:0;">
+          <input type="text" class="form-input" id="novo-instrumento" placeholder="Novo instrumento...">
+          <button class="btn" onclick="adicionarInstrumento()">Adicionar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- MODAL CULTO -->
+<div class="modal-overlay" id="modal-culto">
+  <div class="modal">
+    <div class="modal-title" id="modal-culto-title">Novo Culto</div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Tipo de Culto</label><input type="text" class="form-input" id="c-tipo" placeholder="Culto Dominical"></div>
+      <div class="form-group"><label class="form-label">Data</label><input type="date" class="form-input" id="c-data"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Horario</label><input type="time" class="form-input" id="c-hora"></div>
+      <div class="form-group"><label class="form-label">Local</label><input type="text" class="form-input" id="c-local" placeholder="Templo Principal"></div>
+    </div>
+    <div class="form-group" style="margin-bottom:10px;"><label class="form-label">Pregador / Tema</label><input type="text" class="form-input" id="c-tema" placeholder="Pastor Nome - Tema da Mensagem"></div>
+    <div class="form-group" style="margin-bottom:10px;">
+      <label class="form-label">Musicos Escalados</label>
+      <div id="c-musicos-check" style="display:flex;flex-wrap:wrap;gap:7px;margin-top:5px;"></div>
+    </div>
+    <div class="form-group" style="margin-bottom:18px;"><label class="form-label">Observacoes</label><textarea class="form-textarea" id="c-obs" placeholder="Informacoes extras..."></textarea></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn" onclick="fecharModal('modal-culto')">Cancelar</button>
+      <button class="btn btn-accent" onclick="salvarCulto()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MUSICO -->
+<div class="modal-overlay" id="modal-musico">
+  <div class="modal">
+    <div class="modal-title" id="modal-musico-title">Novo Musico</div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Nome</label><input type="text" class="form-input" id="m-nome" placeholder="Nome completo"></div>
+      <div class="form-group"><label class="form-label">Instrumento</label><select class="form-select" id="m-instrumento"></select></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Funcao</label><input type="text" class="form-input" id="m-funcao" placeholder="Vocal, Tecladista, Regente..."></div>
+      <div class="form-group"><label class="form-label">WhatsApp</label><input type="text" class="form-input" id="m-contato" placeholder="(00) 00000-0000"></div>
+    </div>
+    <div class="form-group" style="margin-bottom:18px;"><label class="form-label">Observacoes</label><textarea class="form-textarea" id="m-obs" placeholder="Disponibilidade, restricoes..."></textarea></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn" onclick="fecharModal('modal-musico')">Cancelar</button>
+      <button class="btn btn-accent" onclick="salvarMusico()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ENSAIO -->
+<div class="modal-overlay" id="modal-ensaio">
+  <div class="modal">
+    <div class="modal-title" id="modal-ensaio-title">Registrar Musica</div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Musica</label><input type="text" class="form-input" id="e-musica" placeholder="Titulo da musica"></div>
+      <div class="form-group"><label class="form-label">Tom</label>
+        <select class="form-select" id="e-tom">
+          <option value="">Selecione</option>
+          <option>C</option><option>C#/Db</option><option>D</option><option>D#/Eb</option>
+          <option>E</option><option>F</option><option>F#/Gb</option><option>G</option>
+          <option>G#/Ab</option><option>A</option><option>A#/Bb</option><option>B</option>
+          <option>Cm</option><option>Dm</option><option>Em</option><option>Fm</option>
+          <option>Gm</option><option>Am</option><option>Bm</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:10px;">
+      <label class="form-label">Musicos nessa Musica</label>
+      <div id="e-musicos-check" style="display:flex;flex-wrap:wrap;gap:7px;margin-top:5px;"></div>
+    </div>
+    <div class="form-group" style="margin-bottom:10px;">
+      <label class="form-label">Status</label>
+      <select class="form-select" id="e-status">
+        <option value="pendente">Pendente</option>
+        <option value="ensaiada">Ensaiada</option>
+        <option value="aprovada">Aprovada para o Culto</option>
+      </select>
+    </div>
+    <div class="form-group" style="margin-bottom:18px;"><label class="form-label">Observacoes</label><textarea class="form-textarea" id="e-obs" placeholder="Arranjos, pontos de atencao..."></textarea></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn" onclick="fecharModal('modal-ensaio')">Cancelar</button>
+      <button class="btn btn-accent" onclick="salvarEnsaioMusica()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STATE LOCAL (cache do Firestore)
+// ============================================================
+let S = {
+  config: { igreja:'', ministerio:'', lider:'', instrumentos:['Violao','Guitarra','Baixo','Bateria','Teclado','Vocal','Flauta','Sax','Trompete','Violino'] },
+  cultos: [],
+  musicos: [],
+  ensaio: { cultoId:'', data:'', local:'', musicas:[] },
+  presencas: {}
+};
+
+let editId = null;
+let currentCultoId = null;
+let db = null;
+let fs = null;
+let configDebounceTimer = null;
+
+// ============================================================
+// FIREBASE INIT
+// ============================================================
+function setSyncStatus(status, msg) {
+  const dot = document.getElementById('syncDot');
+  const txt = document.getElementById('syncText');
+  dot.className = 'sync-dot ' + (status === 'ok' ? '' : status === 'syncing' ? 'syncing' : 'off');
+  txt.textContent = msg;
+}
+
+async function initFirebase() {
+  db = window._db;
+  fs = window._fs;
+  setSyncStatus('syncing', 'Carregando dados do Firebase...');
+  document.getElementById('loading-text').textContent = 'Carregando dados...';
+
+  try {
+    await carregarTudo();
+    setSyncStatus('ok', 'Sincronizado com Firebase — ' + new Date().toLocaleTimeString('pt-BR'));
+    document.getElementById('loading-overlay').classList.add('hidden');
+    setTimeout(() => document.getElementById('loading-overlay').remove(), 500);
+  } catch(e) {
+    setSyncStatus('off', 'Erro ao conectar: ' + e.message + ' — Verifique as configs do Firebase.');
+    document.getElementById('loading-text').textContent = 'Erro: ' + e.message;
+  }
+}
+
+window.addEventListener('firebase-ready', initFirebase);
+
+// ============================================================
+// FIRESTORE HELPERS
+// ============================================================
+async function fsGet(path) {
+  const ref = fs.doc(db, path);
+  const snap = await fs.getDoc(ref);
+  return snap.exists() ? snap.data() : null;
+}
+async function fsSet(path, data) {
+  await fs.setDoc(fs.doc(db, path), data, { merge: true });
+}
+async function fsAdd(col, data) {
+  const ref = await fs.addDoc(fs.collection(db, col), data);
+  return ref.id;
+}
+async function fsUpdate(path, data) {
+  await fs.updateDoc(fs.doc(db, path), data);
+}
+async function fsDelete(path) {
+  await fs.deleteDoc(fs.doc(db, path));
+}
+async function fsGetAll(col) {
+  const snap = await fs.getDocs(fs.collection(db, col));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+// ============================================================
+// CARREGAR DADOS
+// ============================================================
+async function carregarTudo() {
+  const [cfg, cultos, musicos, ensaio, presencas] = await Promise.all([
+    fsGet('configuracoes/dados'),
+    fsGetAll('cultos'),
+    fsGetAll('musicos'),
+    fsGet('ensaio/atual'),
+    fsGet('presencas/dados')
+  ]);
+
+  if (cfg) S.config = { ...S.config, ...cfg };
+  S.cultos = cultos || [];
+  S.musicos = musicos || [];
+  S.ensaio = ensaio || { cultoId:'', data:'', local:'', musicas:[] };
+  S.presencas = (presencas && presencas.mapa) ? presencas.mapa : {};
+
+  renderAll();
+}
+
+// ============================================================
+// SALVAR CONFIG
+// ============================================================
+async function salvarConfig() {
+  setSyncStatus('syncing', 'Salvando configuracoes...');
+  S.config.igreja = document.getElementById('cfg-igreja').value;
+  S.config.ministerio = document.getElementById('cfg-ministerio').value;
+  S.config.lider = document.getElementById('cfg-lider').value;
+  await fsSet('configuracoes/dados', S.config);
+  setSyncStatus('ok', 'Configuracoes salvas — ' + new Date().toLocaleTimeString('pt-BR'));
+}
+function salvarConfigDebounce() {
+  clearTimeout(configDebounceTimer);
+  configDebounceTimer = setTimeout(salvarConfig, 1000);
+}
+
+// ============================================================
+// UTEIS
+// ============================================================
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function iniciais(nome) { return (nome||'').split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase(); }
+function formatData(d) { if(!d)return''; const [y,m,dia]=d.split('-'); return `${dia}/${m}/${y}`; }
+function diaSemana(d) {
+  if(!d)return'';
+  const dias=['Dom','Seg','Ter','Qua','Qui','Sex','Sab'];
+  return dias[new Date(d+'T12:00:00').getDay()];
+}
+function statusBadge(s) {
+  if(s==='aprovada') return '<span class="badge badge-green">Aprovada</span>';
+  if(s==='ensaiada') return '<span class="badge badge-yellow">Ensaiada</span>';
+  return '<span class="badge badge-gray">Pendente</span>';
+}
+function fecharModal(id) { document.getElementById(id).classList.remove('open'); editId=null; }
+function showPanel(id, el) {
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  if(el) el.classList.add('active');
+  const renders = {dashboard:renderDashboard,escala:renderEscala,presenca:renderPresenca,ensaio:renderEnsaio,musicos:renderMusicos,config:renderConfig};
+  if(renders[id]) renders[id]();
+}
+function renderAll() {
+  renderDashboard(); renderEscala(); renderPresenca(); renderEnsaio(); renderMusicos(); renderConfig();
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+function renderDashboard() {
+  document.getElementById('d-cultos').textContent = S.cultos.length;
+  document.getElementById('d-musicos-total').textContent = S.musicos.length;
+  document.getElementById('d-musicas').textContent = (S.ensaio.musicas||[]).length;
+
+  let totalP = 0;
+  Object.values(S.presencas).forEach(ev => Object.values(ev).forEach(v => { if(v==='presente') totalP++; }));
+  document.getElementById('d-presencas').textContent = totalP;
+
+  const lc = document.getElementById('d-lista-cultos');
+  if(!S.cultos.length) lc.innerHTML = '<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px;">Nenhum culto</div>';
+  else lc.innerHTML = [...S.cultos].sort((a,b)=>a.data.localeCompare(b.data)).slice(0,6).map(c=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);">
+      <div><div style="font-size:13px;font-weight:600;">${c.tipo}</div><div style="font-size:11px;color:var(--text2);">${diaSemana(c.data)} ${formatData(c.data)}${c.hora?' • '+c.hora:''}</div></div>
+      <span class="badge badge-accent">${(c.musicos||[]).length} musicos</span>
+    </div>`).join('');
+
+  const lm = document.getElementById('d-lista-musicos');
+  if(!S.musicos.length) lm.innerHTML = '<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px;">Nenhum musico</div>';
+  else lm.innerHTML = S.musicos.map(m=>`
+    <div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--border);">
+      <div class="avatar" style="width:28px;height:28px;font-size:10px;">${iniciais(m.nome)}</div>
+      <div style="flex:1;"><div style="font-size:13px;font-weight:600;">${m.nome}</div><div style="font-size:11px;color:var(--text2);">${m.instrumento}</div></div>
+      <span class="badge badge-gray">${m.funcao||''}</span>
+    </div>`).join('');
+
+  const lp = document.getElementById('d-presenca-lista');
+  const pe = Object.entries(S.presencas);
+  if(!pe.length) lp.innerHTML = '<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px;">Sem registros</div>';
+  else lp.innerHTML = pe.map(([cid,obj])=>{
+    const c = S.cultos.find(x=>x.id===cid); if(!c)return'';
+    const p=Object.values(obj).filter(v=>v==='presente').length, a=Object.values(obj).filter(v=>v==='ausente').length;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+      <div style="font-size:13px;font-weight:600;">${c.tipo} <span style="color:var(--text2);font-weight:400;">${formatData(c.data)}</span></div>
+      <div style="display:flex;gap:5px;"><span class="badge badge-green">${p}P</span><span class="badge badge-red">${a}F</span></div>
+    </div>`;
+  }).join('');
+
+  const le = document.getElementById('d-ensaio-lista');
+  if(!(S.ensaio.musicas||[]).length) le.innerHTML = '<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px;">Sem musicas</div>';
+  else le.innerHTML = S.ensaio.musicas.map(m=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+      <div><div style="font-size:13px;font-weight:600;">${m.musica}</div><div style="font-size:11px;color:var(--text2);">Tom: ${m.tom||'-'}</div></div>
+      ${statusBadge(m.status)}
+    </div>`).join('');
+}
+
+// ============================================================
+// ESCALA
+// ============================================================
+function renderEscala() {
+  const wd = document.getElementById('weekDays');
+  const cultos = [...S.cultos].sort((a,b)=>a.data.localeCompare(b.data));
+  if(!cultos.length){ wd.innerHTML=''; document.getElementById('culto-detail').innerHTML=`<div class="card" style="text-align:center;color:var(--text3);padding:40px;">Nenhum culto. Clique em "+ Novo Culto".</div>`; return; }
+  wd.innerHTML = cultos.map(c=>`<button class="day-chip ${currentCultoId===c.id?'active':''}" onclick="selecionarCulto('${c.id}',this)">${diaSemana(c.data)} ${formatData(c.data)}</button>`).join('');
+  if(!currentCultoId) currentCultoId = cultos[0].id;
+  renderCultoDetail(currentCultoId);
+}
+
+function selecionarCulto(id, el) {
+  currentCultoId = id;
+  document.querySelectorAll('.day-chip').forEach(c=>c.classList.remove('active'));
+  if(el) el.classList.add('active');
+  renderCultoDetail(id);
+}
+
+function renderCultoDetail(id) {
+  const c = S.cultos.find(x=>x.id===id); if(!c)return;
+  const escalados = (c.musicos||[]).map(mid=>S.musicos.find(m=>m.id===mid)).filter(Boolean);
+  document.getElementById('culto-detail').innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div style="font-size:17px;font-weight:700;">${c.tipo}</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:3px;">${diaSemana(c.data)}, ${formatData(c.data)}${c.hora?' • '+c.hora:''}${c.local?' • '+c.local:''}</div>
+        </div>
+        <div style="display:flex;gap:7px;">
+          <button class="btn btn-sm" onclick="editarCulto('${c.id}')">Editar</button>
+          <button class="btn btn-sm btn-danger" onclick="deletarCulto('${c.id}')">Excluir</button>
+        </div>
+      </div>
+      ${c.tema?`<div style="margin-bottom:11px;font-size:13px;"><span style="color:var(--text2);">Pregador/Tema:</span> ${c.tema}</div>`:''}
+      <div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.07em;text-transform:uppercase;margin-bottom:9px;">Musicos Escalados</div>
+      <div class="presenca-grid">
+        ${escalados.length?escalados.map(m=>`
+          <div class="musico-card">
+            <div class="avatar">${iniciais(m.nome)}</div>
+            <div><div class="musico-name">${m.nome}</div><div class="musico-inst">${m.instrumento}</div></div>
+          </div>`).join(''):'<div style="color:var(--text3);font-size:13px;">Nenhum musico escalado</div>'}
+      </div>
+      ${c.obs?`<div class="mini-line"></div><div style="font-size:13px;color:var(--text2);">${c.obs}</div>`:''}
+    </div>`;
+}
+
+function abrirModalCulto() {
+  editId=null;
+  document.getElementById('modal-culto-title').textContent='Novo Culto';
+  ['c-tipo','c-data','c-hora','c-local','c-tema','c-obs'].forEach(id=>document.getElementById(id).value='');
+  renderMusicosCheck('c-musicos-check',[]);
+  document.getElementById('modal-culto').classList.add('open');
+}
+function editarCulto(id) {
+  const c=S.cultos.find(x=>x.id===id); if(!c)return;
+  editId=id;
+  document.getElementById('modal-culto-title').textContent='Editar Culto';
+  document.getElementById('c-tipo').value=c.tipo||'';
+  document.getElementById('c-data').value=c.data||'';
+  document.getElementById('c-hora').value=c.hora||'';
+  document.getElementById('c-local').value=c.local||'';
+  document.getElementById('c-tema').value=c.tema||'';
+  document.getElementById('c-obs').value=c.obs||'';
+  renderMusicosCheck('c-musicos-check',c.musicos||[]);
+  document.getElementById('modal-culto').classList.add('open');
+}
+async function salvarCulto() {
+  const tipo=document.getElementById('c-tipo').value.trim();
+  const data=document.getElementById('c-data').value;
+  if(!tipo||!data){alert('Preencha o tipo e a data.');return;}
+  const musicos=[...document.querySelectorAll('#c-musicos-check input:checked')].map(i=>i.value);
+  const culto={tipo,data,hora:document.getElementById('c-hora').value,local:document.getElementById('c-local').value,tema:document.getElementById('c-tema').value,obs:document.getElementById('c-obs').value,musicos};
+  setSyncStatus('syncing','Salvando culto...');
+  if(editId) {
+    await fsSet('cultos/'+editId, culto);
+    const idx=S.cultos.findIndex(c=>c.id===editId); S.cultos[idx]={id:editId,...culto};
+  } else {
+    const newId=await fsAdd('cultos',culto);
+    S.cultos.push({id:newId,...culto});
+    currentCultoId=newId;
+  }
+  setSyncStatus('ok','Culto salvo — '+new Date().toLocaleTimeString('pt-BR'));
+  fecharModal('modal-culto'); renderEscala(); renderDashboard();
+}
+async function deletarCulto(id) {
+  if(!confirm('Excluir este culto?'))return;
+  setSyncStatus('syncing','Excluindo...');
+  await fsDelete('cultos/'+id);
+  S.cultos=S.cultos.filter(c=>c.id!==id);
+  if(currentCultoId===id) currentCultoId=S.cultos[0]?.id||null;
+  setSyncStatus('ok','Excluido — '+new Date().toLocaleTimeString('pt-BR'));
+  renderEscala(); renderDashboard();
+}
+
+// ============================================================
+// MUSICOS
+// ============================================================
+function renderMusicos() {
+  const grid=document.getElementById('musicos-grid');
+  if(!S.musicos.length){grid.innerHTML='<div class="card" style="text-align:center;color:var(--text3);grid-column:1/-1;padding:40px;">Nenhum musico cadastrado.</div>';return;}
+  grid.innerHTML=S.musicos.map(m=>`
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:11px;margin-bottom:11px;">
+        <div class="avatar" style="width:42px;height:42px;font-size:15px;">${iniciais(m.nome)}</div>
+        <div><div style="font-size:15px;font-weight:700;">${m.nome}</div><div style="font-size:12px;color:var(--text2);">${m.instrumento}</div></div>
+      </div>
+      ${m.funcao?`<div style="font-size:12px;color:var(--text2);margin-bottom:3px;">Funcao: ${m.funcao}</div>`:''}
+      ${m.contato?`<div style="font-size:12px;color:var(--text2);margin-bottom:6px;">WhatsApp: ${m.contato}</div>`:''}
+      ${m.obs?`<div style="font-size:12px;color:var(--text3);margin-bottom:6px;">${m.obs}</div>`:''}
+      <div class="mini-line"></div>
+      <div style="display:flex;gap:7px;">
+        <button class="btn btn-sm" onclick="editarMusico('${m.id}')">Editar</button>
+        <button class="btn btn-sm btn-danger" onclick="deletarMusico('${m.id}')">Excluir</button>
+      </div>
+    </div>`).join('');
+}
+
+function abrirModalMusico() {
+  editId=null;
+  document.getElementById('modal-musico-title').textContent='Novo Musico';
+  ['m-nome','m-funcao','m-contato','m-obs'].forEach(id=>document.getElementById(id).value='');
+  preencherSelectInstrumentos('m-instrumento');
+  document.getElementById('modal-musico').classList.add('open');
+}
+function editarMusico(id) {
+  const m=S.musicos.find(x=>x.id===id); if(!m)return;
+  editId=id;
+  document.getElementById('modal-musico-title').textContent='Editar Musico';
+  document.getElementById('m-nome').value=m.nome||'';
+  document.getElementById('m-funcao').value=m.funcao||'';
+  document.getElementById('m-contato').value=m.contato||'';
+  document.getElementById('m-obs').value=m.obs||'';
+  preencherSelectInstrumentos('m-instrumento',m.instrumento);
+  document.getElementById('modal-musico').classList.add('open');
+}
+async function salvarMusico() {
+  const nome=document.getElementById('m-nome').value.trim();
+  if(!nome){alert('Informe o nome.');return;}
+  const musico={nome,instrumento:document.getElementById('m-instrumento').value,funcao:document.getElementById('m-funcao').value,contato:document.getElementById('m-contato').value,obs:document.getElementById('m-obs').value};
+  setSyncStatus('syncing','Salvando musico...');
+  if(editId) {
+    await fsSet('musicos/'+editId,musico);
+    const idx=S.musicos.findIndex(m=>m.id===editId); S.musicos[idx]={id:editId,...musico};
+  } else {
+    const newId=await fsAdd('musicos',musico);
+    S.musicos.push({id:newId,...musico});
+  }
+  setSyncStatus('ok','Musico salvo — '+new Date().toLocaleTimeString('pt-BR'));
+  fecharModal('modal-musico'); renderMusicos(); renderDashboard();
+}
+async function deletarMusico(id) {
+  if(!confirm('Excluir este musico?'))return;
+  await fsDelete('musicos/'+id);
+  S.musicos=S.musicos.filter(m=>m.id!==id);
+  renderMusicos(); renderDashboard();
+}
+
+function preencherSelectInstrumentos(selectId,selected) {
+  document.getElementById(selectId).innerHTML=S.config.instrumentos.map(i=>`<option value="${i}" ${i===selected?'selected':''}>${i}</option>`).join('');
+}
+function renderMusicosCheck(containerId,selected) {
+  document.getElementById(containerId).innerHTML=S.musicos.map(m=>`
+    <label class="musico-check-label">
+      <input type="checkbox" value="${m.id}" ${selected.includes(m.id)?'checked':''}>${m.nome} <span style="color:var(--text3);">(${m.instrumento})</span>
+    </label>`).join('')||'<span style="color:var(--text3);font-size:13px;">Nenhum musico cadastrado.</span>';
+}
+
+// ============================================================
+// PRESENCA
+// ============================================================
+function renderPresenca() {
+  const sel=document.getElementById('presenca-evento');
+  sel.innerHTML='<option value="">Selecione um culto...</option>'+
+    [...S.cultos].sort((a,b)=>a.data.localeCompare(b.data)).map(c=>`<option value="${c.id}">${diaSemana(c.data)} ${formatData(c.data)} — ${c.tipo}</option>`).join('');
+  carregarPresenca();
+}
+function carregarPresenca() {
+  const cultoId=document.getElementById('presenca-evento').value;
+  const grid=document.getElementById('presenca-grid');
+  if(!cultoId){
+    grid.innerHTML='<div class="card" style="text-align:center;color:var(--text3);grid-column:1/-1;">Selecione um evento</div>';
+    document.getElementById('p-presentes').textContent='0 presentes';
+    document.getElementById('p-ausentes').textContent='0 ausentes';
+    return;
+  }
+  const culto=S.cultos.find(c=>c.id===cultoId);
+  const escalados=(culto.musicos||[]).map(id=>S.musicos.find(m=>m.id===id)).filter(Boolean);
+  if(!S.presencas[cultoId]) S.presencas[cultoId]={};
+  const p=S.presencas[cultoId];
+  let pc=0,ac=0;
+  escalados.forEach(m=>{ if(p[m.id]==='presente')pc++; else if(p[m.id]==='ausente')ac++; });
+  document.getElementById('p-presentes').textContent=pc+' presentes';
+  document.getElementById('p-ausentes').textContent=ac+' ausentes';
+  if(!escalados.length){grid.innerHTML='<div class="card" style="text-align:center;color:var(--text3);grid-column:1/-1;">Nenhum musico escalado</div>';return;}
+  grid.innerHTML=escalados.map(m=>{
+    const st=p[m.id]||'pendente';
+    return `<div class="musico-card ${st}" onclick="togglePresenca('${cultoId}','${m.id}')">
+      <div class="avatar">${iniciais(m.nome)}</div>
+      <div><div class="musico-name">${m.nome}</div><div class="musico-inst">${m.instrumento}</div>
+      <div style="font-size:11px;margin-top:2px;">${st==='presente'?'<span style="color:var(--accent);">Presente</span>':st==='ausente'?'<span style="color:var(--danger);">Ausente</span>':'<span style="color:var(--text3);">Pendente</span>'}</div></div>
+    </div>`;
+  }).join('');
+}
+async function togglePresenca(cultoId,musicoId) {
+  if(!S.presencas[cultoId]) S.presencas[cultoId]={};
+  const atual=S.presencas[cultoId][musicoId];
+  S.presencas[cultoId][musicoId]=atual==='presente'?'ausente':atual==='ausente'?'pendente':'presente';
+  setSyncStatus('syncing','Salvando presenca...');
+  await fsSet('presencas/dados',{mapa:S.presencas});
+  setSyncStatus('ok','Presenca salva — '+new Date().toLocaleTimeString('pt-BR'));
+  carregarPresenca();
+}
+
+// ============================================================
+// ENSAIO
+// ============================================================
+function renderEnsaio() {
+  const selCulto=document.getElementById('ensaio-culto');
+  selCulto.innerHTML='<option value="">Ensaio independente</option>'+
+    [...S.cultos].sort((a,b)=>a.data.localeCompare(b.data)).map(c=>`<option value="${c.id}" ${S.ensaio.cultoId===c.id?'selected':''}>${diaSemana(c.data)} ${formatData(c.data)} — ${c.tipo}</option>`).join('');
+  document.getElementById('ensaio-data').value=S.ensaio.data||'';
+  document.getElementById('ensaio-local').value=S.ensaio.local||'';
+  renderEnsaioMusicas();
+}
+async function salvarEnsaioMeta() {
+  S.ensaio.cultoId=document.getElementById('ensaio-culto').value;
+  S.ensaio.data=document.getElementById('ensaio-data').value;
+  S.ensaio.local=document.getElementById('ensaio-local').value;
+  setSyncStatus('syncing','Salvando ensaio...');
+  await fsSet('ensaio/atual',S.ensaio);
+  setSyncStatus('ok','Ensaio salvo — '+new Date().toLocaleTimeString('pt-BR'));
+}
+function renderEnsaioMusicas() {
+  const lista=document.getElementById('ensaio-musicas-lista');
+  if(!(S.ensaio.musicas||[]).length){lista.innerHTML='<div class="card" style="text-align:center;color:var(--text3);padding:30px;">Nenhuma musica registrada.</div>';return;}
+  lista.innerHTML=S.ensaio.musicas.map((m,idx)=>{
+    const nomes=(m.musicos||[]).map(id=>S.musicos.find(x=>x.id===id)?.nome).filter(Boolean);
+    return `<div class="music-row">
+      <div style="font-size:20px;font-weight:700;color:var(--text3);min-width:26px;">${idx+1}</div>
+      <div class="music-name">${m.musica}</div>
+      <div class="music-meta">
+        ${m.tom?`<span class="badge badge-accent">Tom: ${m.tom}</span>`:''}
+        ${statusBadge(m.status)}
+        ${nomes.length?`<span style="font-size:12px;color:var(--text2);">${nomes.join(', ')}</span>`:''}
+      </div>
+      ${m.obs?`<div style="font-size:12px;color:var(--text3);width:100%;margin-top:3px;">${m.obs}</div>`:''}
+      <div style="display:flex;gap:6px;margin-left:auto;">
+        <button class="btn btn-sm" onclick="editarEnsaioMusica(${idx})">Editar</button>
+        <button class="btn btn-sm btn-danger" onclick="deletarEnsaioMusica(${idx})">Excluir</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function abrirModalEnsaio() {
+  editId=null;
+  document.getElementById('modal-ensaio-title').textContent='Registrar Musica';
+  ['e-musica','e-obs'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('e-tom').value='';
+  document.getElementById('e-status').value='pendente';
+  renderMusicosCheck('e-musicos-check',[]);
+  document.getElementById('modal-ensaio').classList.add('open');
+}
+function editarEnsaioMusica(idx) {
+  const m=S.ensaio.musicas[idx];
+  editId=idx;
+  document.getElementById('modal-ensaio-title').textContent='Editar Musica';
+  document.getElementById('e-musica').value=m.musica||'';
+  document.getElementById('e-tom').value=m.tom||'';
+  document.getElementById('e-status').value=m.status||'pendente';
+  document.getElementById('e-obs').value=m.obs||'';
+  renderMusicosCheck('e-musicos-check',m.musicos||[]);
+  document.getElementById('modal-ensaio').classList.add('open');
+}
+async function salvarEnsaioMusica() {
+  const musica=document.getElementById('e-musica').value.trim();
+  if(!musica){alert('Informe o nome da musica.');return;}
+  const musicos=[...document.querySelectorAll('#e-musicos-check input:checked')].map(i=>i.value);
+  const item={musica,tom:document.getElementById('e-tom').value,status:document.getElementById('e-status').value,obs:document.getElementById('e-obs').value,musicos};
+  if(editId!==null&&editId!==undefined) S.ensaio.musicas[editId]=item;
+  else S.ensaio.musicas.push(item);
+  setSyncStatus('syncing','Salvando musica...');
+  await fsSet('ensaio/atual',S.ensaio);
+  setSyncStatus('ok','Musica salva — '+new Date().toLocaleTimeString('pt-BR'));
+  fecharModal('modal-ensaio'); renderEnsaioMusicas(); renderDashboard();
+}
+async function deletarEnsaioMusica(idx) {
+  if(!confirm('Remover esta musica?'))return;
+  S.ensaio.musicas.splice(idx,1);
+  await fsSet('ensaio/atual',S.ensaio);
+  renderEnsaioMusicas(); renderDashboard();
+}
+
+// ============================================================
+// CONFIG
+// ============================================================
+function renderConfig() {
+  document.getElementById('cfg-igreja').value=S.config.igreja||'';
+  document.getElementById('cfg-ministerio').value=S.config.ministerio||'';
+  document.getElementById('cfg-lider').value=S.config.lider||'';
+  renderInstrumentos();
+}
+function renderInstrumentos() {
+  document.getElementById('instrumentos-lista').innerHTML=S.config.instrumentos.map((inst,i)=>
+    `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);">
+      <span style="font-size:13px;">${inst}</span>
+      <button class="btn btn-sm btn-danger" onclick="removerInstrumento(${i})">X</button>
+    </div>`).join('');
+}
+async function adicionarInstrumento() {
+  const v=document.getElementById('novo-instrumento').value.trim();
+  if(!v)return;
+  S.config.instrumentos.push(v);
+  document.getElementById('novo-instrumento').value='';
+  await fsSet('configuracoes/dados',S.config);
+  renderInstrumentos();
+}
+async function removerInstrumento(i) {
+  S.config.instrumentos.splice(i,1);
+  await fsSet('configuracoes/dados',S.config);
+  renderInstrumentos();
+}
+
+// ============================================================
+// PDF
+// ============================================================
+function gerarPDF() {
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const W=210,M=16,cW=W-M*2;
+  let y=16;
+  const ig=S.config.igreja||'Ministerio de Louvor';
+  const min=S.config.ministerio||'';
+  const lider=S.config.lider||'';
+
+  doc.setFillColor(18,19,21);
+  doc.rect(0,0,210,28,'F');
+  doc.setTextColor(182,255,86);
+  doc.setFontSize(18);doc.setFont('helvetica','bold');
+  doc.text(ig,M,12);
+  doc.setFontSize(9);doc.setFont('helvetica','normal');
+  doc.setTextColor(241,255,220);
+  doc.text(min+(lider?' | Lider: '+lider:''),M,20);
+  doc.text('Gerado em: '+new Date().toLocaleDateString('pt-BR'),W-M,20,{align:'right'});
+  y=36;
+
+  if(S.cultos.length) {
+    doc.setFillColor(26,28,31);
+    doc.rect(M,y-5,cW,9,'F');
+    doc.setTextColor(182,255,86);
+    doc.setFontSize(11);doc.setFont('helvetica','bold');
+    doc.text('ESCALA DE CULTOS',M+3,y+1);
+    y+=12;
+    [...S.cultos].sort((a,b)=>a.data.localeCompare(b.data)).forEach(c=>{
+      doc.setFillColor(240,240,235);
+      doc.rect(M,y,cW,7,'F');
+      doc.setTextColor(18,19,21);doc.setFontSize(10);doc.setFont('helvetica','bold');
+      doc.text(`${c.tipo} — ${diaSemana(c.data)} ${formatData(c.data)}${c.hora?' | '+c.hora:''}${c.local?' | '+c.local:''}`,M+2,y+5);
+      y+=9;
+      if(c.tema){doc.setFont('helvetica','italic');doc.setFontSize(9);doc.setTextColor(60,60,60);doc.text('Pregador/Tema: '+c.tema,M+4,y+4);y+=7;}
+      const esc=(c.musicos||[]).map(id=>S.musicos.find(m=>m.id===id)).filter(Boolean);
+      esc.forEach((m,i)=>{
+        i%2===0?doc.setFillColor(248,248,245):doc.setFillColor(255,255,255);
+        doc.rect(M,y,cW,6,'F');
+        doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(40,40,40);
+        doc.text('  '+m.nome,M+2,y+4);
+        doc.text(m.instrumento,M+cW-2,y+4,{align:'right'});
+        y+=6;
+      });
+      if(c.obs){doc.setFont('helvetica','italic');doc.setFontSize(8);doc.setTextColor(100,100,100);const ls=doc.splitTextToSize('Obs: '+c.obs,cW-6);doc.text(ls,M+4,y+4);y+=ls.length*5+2;}
+      y+=4;
+      if(y>265){doc.addPage();y=16;}
+    });
+  }
+
+  if((S.ensaio.musicas||[]).length) {
+    if(y>240){doc.addPage();y=16;}
+    y+=4;
+    doc.setFillColor(26,28,31);doc.rect(M,y-5,cW,9,'F');
+    doc.setTextColor(182,255,86);doc.setFontSize(11);doc.setFont('helvetica','bold');
+    doc.text('SETLIST DO ENSAIO',M+3,y+1);y+=12;
+    doc.setFillColor(230,240,220);doc.rect(M,y,cW,6,'F');
+    doc.setTextColor(18,19,21);doc.setFontSize(9);doc.setFont('helvetica','bold');
+    doc.text('#',M+2,y+4);doc.text('Musica',M+10,y+4);doc.text('Tom',M+90,y+4);doc.text('Status',M+110,y+4);doc.text('Musicos',M+140,y+4);
+    y+=6;
+    S.ensaio.musicas.forEach((m,idx)=>{
+      idx%2===0?doc.setFillColor(252,252,252):doc.setFillColor(245,245,245);
+      doc.rect(M,y,cW,6,'F');
+      doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(40,40,40);
+      doc.text(String(idx+1),M+2,y+4);doc.text(m.musica,M+10,y+4);doc.text(m.tom||'-',M+90,y+4);
+      doc.text(m.status==='aprovada'?'Aprovada':m.status==='ensaiada'?'Ensaiada':'Pendente',M+110,y+4);
+      const mn=(m.musicos||[]).map(id=>S.musicos.find(x=>x.id===id)?.nome).filter(Boolean).join(', ');
+      doc.text(doc.splitTextToSize(mn,48)[0]||'',M+140,y+4);
+      y+=6;if(y>265){doc.addPage();y=16;}
+    });
+  }
+
+  const pe=Object.entries(S.presencas).filter(([,v])=>Object.keys(v).length);
+  if(pe.length) {
+    if(y>220){doc.addPage();y=16;}
+    y+=6;
+    doc.setFillColor(26,28,31);doc.rect(M,y-5,cW,9,'F');
+    doc.setTextColor(182,255,86);doc.setFontSize(11);doc.setFont('helvetica','bold');
+    doc.text('REGISTRO DE PRESENCA',M+3,y+1);y+=12;
+    pe.forEach(([cid,obj])=>{
+      const c=S.cultos.find(x=>x.id===cid);if(!c)return;
+      doc.setFillColor(240,240,235);doc.rect(M,y,cW,6,'F');
+      doc.setTextColor(18,19,21);doc.setFont('helvetica','bold');doc.setFontSize(9);
+      doc.text(`${c.tipo} — ${formatData(c.data)}`,M+2,y+4);y+=6;
+      Object.entries(obj).forEach(([mid,st])=>{
+        const m=S.musicos.find(x=>x.id===mid);if(!m)return;
+        doc.setFont('helvetica','normal');doc.setTextColor(40,40,40);doc.setFontSize(9);
+        doc.text('  '+m.nome,M+2,y+4);
+        if(st==='presente')doc.setTextColor(30,130,80);else if(st==='ausente')doc.setTextColor(180,40,40);else doc.setTextColor(120,120,100);
+        doc.text(st==='presente'?'PRESENTE':st==='ausente'?'AUSENTE':'PENDENTE',M+cW-2,y+4,{align:'right'});
+        doc.setTextColor(40,40,40);y+=6;if(y>265){doc.addPage();y=16;}
+      });y+=3;
+    });
+  }
+
+  const tp=doc.getNumberOfPages();
+  for(let i=1;i<=tp;i++){
+    doc.setPage(i);
+    doc.setFillColor(18,19,21);doc.rect(0,286,210,11,'F');
+    doc.setTextColor(182,255,86);doc.setFontSize(8);doc.setFont('helvetica','normal');
+    doc.text(ig+(min?' — '+min:''),M,292);
+    doc.text('Pagina '+i+' de '+tp,W-M,292,{align:'right'});
+  }
+  doc.save('escala-louvor.pdf');
+}
+
+// ============================================================
+// CLOSE MODALS ON OVERLAY CLICK
+// ============================================================
+document.querySelectorAll('.modal-overlay').forEach(m=>{
+  m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');});
+});
+</script>
+</body>
+</html>
